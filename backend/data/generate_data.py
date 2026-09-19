@@ -304,7 +304,7 @@ def float_range(start: float, stop: float, step: float):
 
 def generate_elevation_grids(data_dir: str):
     """Generate dense DEM elevation grids (CSV format) for each region."""
-    step = 0.004  # ~400m spatial sampling resolution
+    step = 0.003  # ~300m spatial sampling resolution
     
     for region_id, reg_cfg in REGIONS.items():
         csv_filename = os.path.join(data_dir, f"elevation_{region_id}.csv")
