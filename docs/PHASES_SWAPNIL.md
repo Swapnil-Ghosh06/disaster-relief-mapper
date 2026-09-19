@@ -12,13 +12,13 @@
 
 | Phase | What | Days | Status |
 |-------|------|------|--------|
-| 0 | Repo + Project Setup | Day 1 | ⬜ |
-| 1 | Base Map + Resource Markers | Days 2–3 | ⬜ |
-| 2 | Flood Simulation Layer | Days 4–5 | ⬜ |
-| 3 | Cyclone Simulation (Three.js) | Days 6–7 | ⬜ |
-| 4 | Rerouting Visualization | Day 8 | ⬜ |
-| 5 | UI Polish + Control Panel | Days 9–10 | ⬜ |
-| 6 | Final Testing + Handoff | Day 11 | ⬜ |
+| 0 | Repo + Project Setup | Day 1 | ✅ Done |
+| 1 | Base Map + Resource Markers | Days 2–3 | ✅ Done |
+| 2 | Flood Simulation Layer | Days 4–5 | ✅ Done |
+| 3 | Cyclone Simulation (Three.js / deck.gl) | Days 6–7 | ✅ Done |
+| 4 | Rerouting Visualization | Day 8 | ✅ Done |
+| 5 | UI Polish + Full Ops Control Panel | Days 9–10 | ✅ Done |
+| 6 | Final Testing + Handoff | Day 11 | 🔄 Ready |
 
 ---
 
