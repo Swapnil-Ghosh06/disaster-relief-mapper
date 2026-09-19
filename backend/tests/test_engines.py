@@ -28,12 +28,14 @@ def test_haversine_known_distance():
 def test_apply_severity_scaling():
     """Verify severity scaling limits and multipliers."""
     base_radius = 10.0
-    # Severity 1 -> 10 * (0.5 + 0.1) = 6.0
-    assert math.isclose(apply_severity(base_radius, 1), 6.0)
-    # Severity 5 -> 10 * (0.5 + 0.5) = 10.0
-    assert math.isclose(apply_severity(base_radius, 5), 10.0)
-    # Severity 10 -> 10 * (0.5 + 1.0) = 15.0
-    assert math.isclose(apply_severity(base_radius, 10), 15.0)
+    # Severity 1 -> 10 * 0.5 = 5.0
+    assert math.isclose(apply_severity(base_radius, 1), 5.0)
+    # Severity 4 -> 10 * 1.0 = 10.0
+    assert math.isclose(apply_severity(base_radius, 4), 10.0)
+    # Severity 7 -> 10 * 1.5 = 15.0
+    assert math.isclose(apply_severity(base_radius, 7), 15.0)
+    # Severity 10 -> 10 * 2.0 = 20.0
+    assert math.isclose(apply_severity(base_radius, 10), 20.0)
 
 
 def test_simulate_cyclone():
