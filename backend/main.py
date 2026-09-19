@@ -7,10 +7,12 @@ elevation queries, relief facility registries, and automated emergency rerouting
 
 import os
 import json
+import logging
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query, status
+from fastapi import FastAPI, HTTPException, Query, Request, status
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from models.schemas import (
@@ -33,11 +35,19 @@ from engines.flood_engine import load_elevation, simulate_flood
 from engines.cyclone_engine import simulate_cyclone
 from engines.router import generate_all_routes
 
+# Configure logger
+logger = logging.getLogger("disaster_mapper_api")
+logging.basicConfig(level=logging.INFO)
+
 # Base directory paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 RESOURCES_FILE = os.path.join(DATA_DIR, "resources.json")
 
+# Centralized supported regions set
+SUPPORTED_REGIONS = {"chennai", "mumbai", "bhubaneswar", "kolkata", "wellington"}
+
+# Detailed regional metadata lookup
 VALID_REGIONS: Dict[str, Dict[str, Any]] = {
     "chennai": {
         "id": "chennai",
@@ -92,10 +102,22 @@ VALID_REGIONS: Dict[str, Dict[str, Any]] = {
 }
 
 
+def validate_region(region: str) -> str:
+    """Validate that the given region is in SUPPORTED_REGIONS."""
+    normalized = region.lower().strip()
+    if normalized not in SUPPORTED_REGIONS:
+        supported_str = ", ".join(sorted(SUPPORTED_REGIONS))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported region: '{region}'. Supported: {supported_str}"
+        )
+    return normalized
+
+
 def ensure_data_files():
     """Ensure resources.json and elevation grids exist; generate if missing."""
     if not os.path.exists(RESOURCES_FILE):
-        print("[INIT] resources.json not found. Running data generator...")
+        logger.info("[INIT] resources.json not found. Running data generator...")
         from data.generate_data import main as run_generator
         run_generator()
 
@@ -105,7 +127,7 @@ async def lifespan(app: FastAPI):
     """Lifespan context manager for initialization and warm-up caching."""
     ensure_data_files()
     # Pre-cache elevation grids for instant query responses (<5ms)
-    for region_key in VALID_REGIONS:
+    for region_key in SUPPORTED_REGIONS:
         load_elevation(region_key, data_dir=DATA_DIR)
     yield
 
@@ -127,16 +149,32 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global exception handler converting unhandled exceptions to HTTP 500 JSON response."""
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+        )
+    logger.error(f"Unhandled server exception: {str(exc)}", exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Internal server error"},
+    )
+
+
 def _load_all_resources() -> List[Dict[str, Any]]:
-    """Helper to safely load resources from JSON storage."""
+    """Helper to safely load resources from JSON storage with fallback handling."""
     ensure_data_files()
     try:
         with open(RESOURCES_FILE, mode="r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as exc:
+        logger.error(f"Failed to read relief resource dataset: {str(exc)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to read relief resource dataset: {str(exc)}"
+            detail="Internal server error"
         )
 
 
@@ -179,13 +217,7 @@ async def get_resources(
     Retrieve all operational disaster relief facilities (shelters, food banks, medical camps)
     for a designated geographic region.
     """
-    normalized_region = region.lower().strip()
-    if normalized_region not in VALID_REGIONS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid region '{region}'. Supported regions: {list(VALID_REGIONS.keys())}"
-        )
-        
+    normalized_region = validate_region(region)
     all_res = _load_all_resources()
     filtered = [r for r in all_res if r.get("region", "").lower() == normalized_region]
     
@@ -203,13 +235,7 @@ async def get_elevation(
     """
     Retrieve dense digital elevation model (DEM) grid cells and bounding box for a region.
     """
-    normalized_region = region.lower().strip()
-    if normalized_region not in VALID_REGIONS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid region '{region}'. Supported regions: {list(VALID_REGIONS.keys())}"
-        )
-        
+    normalized_region = validate_region(region)
     lookup = load_elevation(normalized_region, data_dir=DATA_DIR)
     
     grid = [
@@ -239,13 +265,8 @@ async def flood_simulate(request: FloodSimulateRequest):
     """
     Simulate flood water level inundation and identify compromised / operational relief assets.
     """
-    normalized_region = request.region.lower().strip()
-    if normalized_region not in VALID_REGIONS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid region '{request.region}'. Supported regions: {list(VALID_REGIONS.keys())}"
-        )
-        
+    normalized_region = validate_region(request.region)
+    
     if request.water_level_m < 0.0 or request.water_level_m > 20.0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -271,13 +292,8 @@ async def cyclone_simulate(request: CycloneSimulateRequest):
     """
     Simulate cyclone landfall and compute high-wind damage swath using Haversine geodesic equations.
     """
-    normalized_region = request.region.lower().strip()
-    if normalized_region not in VALID_REGIONS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid region '{request.region}'. Supported regions: {list(VALID_REGIONS.keys())}"
-        )
-        
+    normalized_region = validate_region(request.region)
+    
     if request.severity < 1 or request.severity > 10:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -310,13 +326,8 @@ async def reroute(request: RerouteRequest):
     Compute optimal shortest-distance backup paths to functional facilities of identical category
     for all incapacitated relief resources.
     """
-    normalized_region = request.region.lower().strip()
-    if normalized_region not in VALID_REGIONS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid region '{request.region}'. Supported regions: {list(VALID_REGIONS.keys())}"
-        )
-        
+    normalized_region = validate_region(request.region)
+    
     if not request.offline_ids:
         return RerouteResponse(routes=[])
         

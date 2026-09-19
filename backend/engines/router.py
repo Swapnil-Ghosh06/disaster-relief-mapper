@@ -17,19 +17,13 @@ def find_nearest_alternative(
     """
     Locate the closest operational relief facility matching the resource type.
     
-    Category-Preserving Nearest-Neighbor Optimization:
-        Given an incapacitated facility f_off of category T = type(f_off), identify:
-            f* = argmin_{f in C} [ haversine(coord(f_off), coord(f)) ]
-        where candidate set C is defined as:
-            C = { f in all_resources | type(f) == T and id(f) not in offline_ids and id(f) != id(f_off) }
-            
     Args:
-        offline_resource (dict): The incapacitated facility record requiring dynamic rerouting.
-        all_resources (List[dict]): Global catalog of relief resources in the active region.
+        offline_resource (Dict[str, Any]): The incapacitated facility record requiring dynamic rerouting.
+        all_resources (List[Dict[str, Any]]): Global catalog of relief resources in the active region.
         offline_ids (Union[List[str], Set[str]]): Collection of all currently incapacitated facility IDs.
         
     Returns:
-        Optional[dict]: Shortest-path route recommendation dictionary, or None if no alternatives exist.
+        Optional[Dict[str, Any]]: Shortest-path route recommendation dictionary, or None if no alternatives exist.
             Structure: {
                 "from_id": str,
                 "from_name": str,
@@ -42,6 +36,13 @@ def find_nearest_alternative(
                 "distance_km": float,
                 "resource_type": str
             }
+            
+    Notes / Formula:
+        Category-Preserving Geodesic Minimization:
+            Given an incapacitated facility f_off of category T = type(f_off), identify:
+                f* = argmin_{f in C} [ haversine(coord(f_off), coord(f)) ]
+            where candidate set C is defined as:
+                C = { f in all_resources | type(f) == T and id(f) not in offline_ids and id(f) != id(f_off) }
             
     Example:
         >>> off = {"id": "SH001", "name": "Anna Nagar", "type": "shelter", "lat": 13.085, "lng": 80.210}
@@ -101,10 +102,20 @@ def generate_all_routes(
     
     Args:
         offline_ids (List[str]): List of offline or damaged facility IDs.
-        all_resources (List[dict]): Complete catalog of regional resources.
+        all_resources (List[Dict[str, Any]]): Complete catalog of regional resources.
         
     Returns:
-        List[dict]: Array of route objects linking each offline resource to its nearest alternative.
+        List[Dict[str, Any]]: Array of route objects linking each offline resource to its nearest alternative.
+        
+    Notes / Formula:
+        Multi-Facility Route Generation:
+            routes = [ find_nearest_alternative(f, all_resources, offline_ids) for f in all_resources if id(f) in offline_ids ]
+            where non-null route dictionaries are retained in the output set.
+            
+    Example:
+        >>> all_r = [{"id": "SH001", "name": "S1", "type": "shelter", "lat": 13.0, "lng": 80.0}, {"id": "SH002", "name": "S2", "type": "shelter", "lat": 13.01, "lng": 80.01}]
+        >>> generate_all_routes(["SH001"], all_r)
+        [{'from_id': 'SH001', 'from_name': 'S1', 'from_lat': 13.0, 'from_lng': 80.0, 'to_id': 'SH002', 'to_name': 'S2', 'to_lat': 13.01, 'to_lng': 80.01, 'distance_km': 1.54, 'resource_type': 'shelter'}]
     """
     offline_id_set = set(offline_ids)
     offline_resources = [r for r in all_resources if r["id"] in offline_id_set]

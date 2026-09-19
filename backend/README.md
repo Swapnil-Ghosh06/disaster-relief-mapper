@@ -1,6 +1,6 @@
 # 🌊 Disaster Relief Resource Mapper — Backend API
 
-FastAPI backend service powering real-time flood inundation physics, cyclone radial damage estimation, elevation topography queries, and shortest-path emergency facility rerouting.
+FastAPI backend service powering real-time flood inundation physics, cyclone radial damage estimation, digital elevation model (DEM) topography queries, and shortest-path emergency facility rerouting.
 
 Built with **Python (FastAPI) + React** for disaster response simulation.
 
@@ -39,15 +39,17 @@ Interactive OpenAPI Swagger documentation is available at:
 
 ## 📡 API Endpoints
 
-| Method | Endpoint | Description | Sample Parameters / Payload |
-|--------|----------|-------------|-----------------------------|
-| `GET` | `/` | Health check & service metadata | None |
-| `GET` | `/regions` | Available disaster regions & coordinates | None |
-| `GET` | `/resources` | Relief facilities for a region | `?region=chennai` |
-| `GET` | `/elevation` | DEM elevation grid & bounding box | `?region=chennai` |
-| `POST` | `/flood/simulate` | Simulates flood water level inundation | `{"region": "chennai", "water_level_m": 4.5}` |
-| `POST` | `/cyclone/simulate` | Simulates cyclone wind swath damage | `{"region": "chennai", "eye_lat": 13.08, "eye_lng": 80.27, "radius_km": 10.0, "severity": 6}` |
-| `POST` | `/reroute` | Computes nearest operational alternatives | `{"region": "chennai", "offline_ids": ["SH001", "MC001"]}` |
+Full schema reference is documented in [`docs/SCHEMA.md`](file:///d:/Coding/disaster%20management/docs/SCHEMA.md).
+
+| Method | Endpoint | Description | Request Parameters / Payload | Response Shape |
+|--------|----------|-------------|------------------------------|----------------|
+| `GET` | `/` | Service health status | None | `{"status": "online", "service": str, "version": str, "endpoints": [...]}` |
+| `GET` | `/regions` | Available disaster regions & coordinates | None | `{"regions": [{"id": str, "name": str, "center_lat": float, "center_lng": float, "zoom": float, "disaster_risk": [...]}]}` |
+| `GET` | `/resources` | Relief facilities for a region | Query: `?region=chennai` (optional) | `{"region": str, "total": int, "resources": [{"id": str, "type": str, "name": str, "lat": float, "lng": float, "elevation_m": float, "status": "online", ...}]}` |
+| `GET` | `/elevation` | DEM elevation grid & bounding box | Query: `?region=chennai` (optional) | `{"region": str, "bbox": {"min_lat": float, "max_lat": float, ...}, "grid": [{"lat": float, "lng": float, "elevation_m": float}]}` |
+| `POST` | `/flood/simulate` | Simulates flood water level inundation | Body: `{"region": "chennai", "water_level_m": 4.5, "resource_ids": []}` | `{"water_level_m": float, "offline": [str], "online": [str], "affected_capacity": int}` |
+| `POST` | `/cyclone/simulate` | Simulates cyclone wind swath damage | Body: `{"region": "chennai", "eye_lat": 13.08, "eye_lng": 80.27, "radius_km": 10.0, "severity": 6}` | `{"eye": {"lat": float, "lng": float}, "radius_km": float, "severity": int, "damaged": [str], "safe": [str], "affected_capacity": int}` |
+| `POST` | `/reroute` | Computes nearest operational alternatives | Body: `{"region": "chennai", "offline_ids": ["SH001", "MC001"]}` | `{"routes": [{"from_id": str, "from_name": str, "to_id": str, "to_name": str, "distance_km": float, "resource_type": str}]}` |
 
 ---
 
@@ -63,8 +65,8 @@ pytest -v
 
 ```
 backend/
-├── main.py                  # FastAPI app instance, CORS middleware, routes
-├── requirements.txt         # Project dependencies
+├── main.py                  # FastAPI app instance, CORS middleware, routes & input validation
+├── requirements.txt         # Pinned project dependencies
 ├── models/
 │   ├── __init__.py
 │   └── schemas.py           # Pydantic request & response schemas
@@ -76,7 +78,7 @@ backend/
 ├── data/
 │   ├── generate_data.py     # Synthetic data & DEM elevation grid generator
 │   ├── resources.json       # Relief resource catalog
-│   ├── elevation_*.csv      # Regional DEM CSV files
+│   ├── elevation_*.csv      # Regional DEM CSV files (~300m resolution)
 │   └── README.md            # Data dictionary documentation
 └── tests/
     ├── __init__.py

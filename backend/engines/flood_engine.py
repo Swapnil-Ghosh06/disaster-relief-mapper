@@ -15,16 +15,29 @@ _ELEVATION_CACHE: Dict[str, Dict[Tuple[float, float], float]] = {}
 
 def load_elevation(region: str, data_dir: Optional[str] = None) -> Dict[Tuple[float, float], float]:
     """
-    Load regional elevation grid into an in-memory spatial hash table.
+    Load regional digital elevation model (DEM) grid into an in-memory spatial hash table.
     
-    Caches parsed grids in memory for sub-millisecond query performance.
+    Caches parsed grids in module-level memory for sub-millisecond query performance.
     
     Args:
-        region (str): Region key (e.g. 'chennai', 'mumbai').
-        data_dir (str, optional): Base directory containing elevation CSV files.
+        region (str): Region key (e.g. 'chennai', 'mumbai', 'bhubaneswar', 'kolkata', 'wellington').
+        data_dir (Optional[str]): Base directory containing elevation CSV files. Defaults to backend/data.
         
     Returns:
-        dict: Mapping of (round(lat, 3), round(lng, 3)) tuples to elevation in meters.
+        Dict[Tuple[float, float], float]: Mapping of (round(lat, 3), round(lng, 3)) coordinate tuples
+            to ground elevation in meters above mean sea level.
+            
+    Notes / Formula:
+        Spatial Hash Indexing:
+            key = (round(lat, 3), round(lng, 3))
+            lookup[key] = elevation_m
+            
+    Example:
+        >>> grid = load_elevation("chennai")
+        >>> isinstance(grid, dict)
+        True
+        >>> (13.083, 80.271) in grid or len(grid) > 0
+        True
     """
     global _ELEVATION_CACHE
     if region in _ELEVATION_CACHE:
@@ -55,17 +68,26 @@ def load_elevation(region: str, data_dir: Optional[str] = None) -> Dict[Tuple[fl
 
 def get_resource_elevation(resource: Dict[str, Any], elevation_lookup: Dict[Tuple[float, float], float]) -> float:
     """
-    Retrieve the ground elevation in meters at a given relief facility coordinate.
+    Retrieve or interpolate the ground elevation in meters at a given relief facility coordinate.
     
     Uses exact spatial hash lookup if present, falls back to direct facility
-    elevation attribute, or finds the closest available DEM grid node.
+    elevation attribute, or finds the Euclidean nearest available DEM grid node.
     
     Args:
-        resource (dict): Facility record containing 'lat', 'lng', and optional 'elevation_m'.
-        elevation_lookup (dict): In-memory elevation dictionary for the region.
+        resource (Dict[str, Any]): Facility record containing 'lat', 'lng', and optional 'elevation_m'.
+        elevation_lookup (Dict[Tuple[float, float], float]): In-memory elevation dictionary for the region.
         
     Returns:
-        float: Estimated ground elevation in meters.
+        float: Estimated ground elevation in meters above sea level.
+        
+    Notes / Formula:
+        Nearest Neighbor Fallback:
+            argmin_{(lat_g, lng_g) in DEM} [ (lat_g - lat_res)² + (lng_g - lng_res)² ]
+            
+    Example:
+        >>> lookup = {(13.085, 80.210): 4.2}
+        >>> get_resource_elevation({"lat": 13.085, "lng": 80.210}, lookup)
+        4.2
     """
     res_lat = float(resource["lat"])
     res_lng = float(resource["lng"])
@@ -107,27 +129,28 @@ def simulate_flood(
     """
     Simulate flood water rise across a region and partition facilities into offline/online.
     
-    Topographical Inundation Criterion:
-        A relief facility at coordinate (lat, lng) with ground elevation e_m is marked
-        as 'offline' if:
-            e_m <= water_level_m
-        Otherwise, if e_m > water_level_m, the facility remains accessible ('online').
-        
-    Capacity Loss Formula:
-        affected_capacity = sum(capacity_i for i in offline_facilities)
-        where capacity_i is the facility's max capacity, daily meal capacity, or bed count.
-    
     Args:
         water_level_m (float): Flood inundation stage height in meters (0.0 to 20.0m).
-        resources (List[dict]): Array of resource objects in the simulated region.
-        elevation_lookup (dict): In-memory spatial DEM dictionary mapping (lat, lng) -> elevation_m.
+        resources (List[Dict[str, Any]]): Array of resource objects in the simulated region.
+        elevation_lookup (Dict[Tuple[float, float], float]): In-memory spatial DEM dictionary mapping (lat, lng) -> elevation_m.
         
     Returns:
-        dict: Inundation summary containing:
-            - water_level_m (float): Evaluated water level
-            - offline (list[str]): List of submerged / incapacitated resource IDs
-            - online (list[str]): List of accessible, operational resource IDs
+        Dict[str, Any]: Inundation summary containing:
+            - water_level_m (float): Evaluated water level in meters
+            - offline (List[str]): List of submerged / incapacitated resource IDs
+            - online (List[str]): List of accessible, operational resource IDs
             - affected_capacity (int): Total combined throughput/capacity lost
+            
+    Notes / Formula:
+        Topographical Inundation Criterion:
+            A relief facility at coordinate (lat, lng) with ground elevation e_m is marked
+            as 'offline' if:
+                e_m <= water_level_m
+            Otherwise, if e_m > water_level_m, the facility remains accessible ('online').
+            
+        Capacity Loss Formula:
+            affected_capacity = sum(capacity_i for i in offline_facilities)
+            where capacity_i is the facility's max capacity, daily meal capacity, or bed count.
             
     Example:
         >>> lookup = {(13.082, 80.270): 2.5}

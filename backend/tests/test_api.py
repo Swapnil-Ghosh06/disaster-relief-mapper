@@ -55,7 +55,7 @@ def test_get_resources_invalid_region():
     """Verify invalid region returns HTTP 400 Bad Request."""
     response = client.get("/resources?region=atlantis")
     assert response.status_code == 400
-    assert "Invalid region" in response.json()["detail"]
+    assert "Unsupported region" in response.json()["detail"]
 
 
 def test_get_elevation():
