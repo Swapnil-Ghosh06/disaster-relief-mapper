@@ -107,20 +107,33 @@ def simulate_flood(
     """
     Simulate flood water rise across a region and partition facilities into offline/online.
     
-    Facilities with terrain elevation strictly below the flood water level
-    are categorized as submerged/offline.
+    Topographical Inundation Criterion:
+        A relief facility at coordinate (lat, lng) with ground elevation e_m is marked
+        as 'offline' if:
+            e_m <= water_level_m
+        Otherwise, if e_m > water_level_m, the facility remains accessible ('online').
+        
+    Capacity Loss Formula:
+        affected_capacity = sum(capacity_i for i in offline_facilities)
+        where capacity_i is the facility's max capacity, daily meal capacity, or bed count.
     
     Args:
-        water_level_m (float): Flood inundation stage height in meters.
-        resources (List[dict]): Array of resources to evaluate.
-        elevation_lookup (dict): Regional elevation dictionary.
+        water_level_m (float): Flood inundation stage height in meters (0.0 to 20.0m).
+        resources (List[dict]): Array of resource objects in the simulated region.
+        elevation_lookup (dict): In-memory spatial DEM dictionary mapping (lat, lng) -> elevation_m.
         
     Returns:
         dict: Inundation summary containing:
             - water_level_m (float): Evaluated water level
-            - offline (list[str]): List of submerged resource IDs
+            - offline (list[str]): List of submerged / incapacitated resource IDs
             - online (list[str]): List of accessible, operational resource IDs
-            - affected_capacity (int): Aggregated capacity lost across submerged facilities
+            - affected_capacity (int): Total combined throughput/capacity lost
+            
+    Example:
+        >>> lookup = {(13.082, 80.270): 2.5}
+        >>> res = [{"id": "SH001", "lat": 13.082, "lng": 80.270, "capacity": 200}]
+        >>> simulate_flood(3.0, res, lookup)
+        {'water_level_m': 3.0, 'offline': ['SH001'], 'online': [], 'affected_capacity': 200}
     """
     offline: List[str] = []
     online: List[str] = []
@@ -129,7 +142,7 @@ def simulate_flood(
     for resource in resources:
         elevation = get_resource_elevation(resource, elevation_lookup)
         
-        if elevation < water_level_m:
+        if elevation <= water_level_m:
             offline.append(resource["id"])
             cap = (
                 resource.get("capacity")
