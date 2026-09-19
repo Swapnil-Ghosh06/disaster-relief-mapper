@@ -2,22 +2,18 @@ import { useMemo } from 'react';
 import { PolygonLayer } from '@deck.gl/layers';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Buildings3DLayer — 3D Extruded Urban Buildings & Houses
+// Buildings3DLayer — Photorealistic 3D Urban Skyscrapers & Houses
 //
-// Features:
-// - Extruded 3D structures with elevation and physical height
-// - Inundation physics: buildings submerge as waterLevel rises above ground elev
-// - Cyclone physics: buildings within storm radius take wind/structural damage
-// - Interactive hover tooltips & inspection
+// Models dense urban skylines and residential communities matching real coastal
+// geography (inspired by Miami / Chennai / Mumbai coastal floodscapes).
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Helper to generate a small rectangular building footprint polygon
-function makeBuildingPolygon(centerLat, centerLng, widthMeters = 35, lengthMeters = 45, rotationDeg = 0) {
+// Helper to generate rectangular building footprint polygon
+function makeBuildingFootprint(centerLat, centerLng, widthMeters = 30, lengthMeters = 40, rotationDeg = 0) {
   const rad = (rotationDeg * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
 
-  // Approximate degrees per meter at ~13-20 deg lat
   const latScale = 1 / 111000;
   const lngScale = 1 / (111000 * Math.cos((centerLat * Math.PI) / 180));
 
@@ -38,135 +34,120 @@ function makeBuildingPolygon(centerLat, centerLng, widthMeters = 35, lengthMeter
   });
 }
 
-// Generate realistic synthetic buildings for each region
+// Generates dense realistic 3D building clusters
 export function generateRegionBuildings(region = 'chennai') {
   const buildings = [];
 
-  // Seeded pseudo-random generator
-  let seed = 12345;
-  const pseudoRand = () => {
+  let seed = 42891;
+  const rand = () => {
     seed = (seed * 9301 + 49297) % 233280;
     return seed / 233280;
   };
 
+  // Coastal / Urban Sectors
+  let sectors = [];
+
   if (region === 'chennai') {
-    // Clusters around Marina, Adyar, Velachery, T. Nagar, Anna Nagar, Mylapore, Porur
-    const clusters = [
-      { name: 'Velachery Lowlands', centerLat: 12.9815, centerLng: 80.2180, baseElev: 1.8, count: 48, radiusM: 900, type: 'residential' },
-      { name: 'Adyar River Basin', centerLat: 13.0050, centerLng: 80.2550, baseElev: 2.2, count: 42, radiusM: 800, type: 'residential' },
-      { name: 'Marina Beachfront', centerLat: 13.0610, centerLng: 80.2816, baseElev: 1.1, count: 36, radiusM: 700, type: 'commercial' },
-      { name: 'T. Nagar Central', centerLat: 13.0418, centerLng: 80.2341, baseElev: 6.2, count: 50, radiusM: 1000, type: 'commercial' },
-      { name: 'Anna Nagar West', centerLat: 13.0850, centerLng: 80.2101, baseElev: 4.5, count: 45, radiusM: 900, type: 'residential' },
-      { name: 'Mylapore Civic', centerLat: 13.0368, centerLng: 80.2676, baseElev: 3.5, count: 38, radiusM: 750, type: 'civic' },
-      { name: 'Porur Heights', centerLat: 13.0358, centerLng: 80.1572, baseElev: 11.2, count: 35, radiusM: 900, type: 'commercial' },
+    sectors = [
+      // Downtown Coastal Skyscrapers (Marina & Santhome Waterfront)
+      { name: 'Marina Waterfront High-Rises', lat: 13.0610, lng: 80.2816, baseElev: 1.2, count: 50, radiusM: 700, class: 'skyscraper' },
+      { name: 'Adyar Bay Towers', lat: 13.0080, lng: 80.2600, baseElev: 2.1, count: 45, radiusM: 650, class: 'skyscraper' },
+      // Mid-Rise Commercial & Civic
+      { name: 'T. Nagar Commercial Hub', lat: 13.0418, lng: 80.2341, baseElev: 6.2, count: 55, radiusM: 800, class: 'midrise' },
+      { name: 'Mylapore Cultural & Civic Quarter', lat: 13.0368, lng: 80.2676, baseElev: 3.4, count: 40, radiusM: 600, class: 'midrise' },
+      { name: 'Anna Nagar Financial Corridor', lat: 13.0850, lng: 80.2101, baseElev: 4.5, count: 48, radiusM: 750, class: 'midrise' },
+      // Dense Residential Lowlands (High flood vulnerability)
+      { name: 'Velachery Residential Suburb', lat: 12.9815, lng: 80.2180, baseElev: 1.8, count: 65, radiusM: 950, class: 'houses' },
+      { name: 'Besant Nagar Coastal Villas', lat: 12.9990, lng: 80.2680, baseElev: 1.6, count: 45, radiusM: 650, class: 'houses' },
+      { name: 'Porur Heights Neighborhood', lat: 13.0358, lng: 80.1572, baseElev: 11.2, count: 40, radiusM: 800, class: 'houses' },
     ];
+  } else if (region === 'mumbai') {
+    sectors = [
+      { name: 'Bandra-Kurla Complex (BKC) Towers', lat: 19.0650, lng: 72.8650, baseElev: 5.5, count: 60, radiusM: 800, class: 'skyscraper' },
+      { name: 'Worli Coastal Skyscraper Corridor', lat: 19.0160, lng: 72.8180, baseElev: 4.2, count: 55, radiusM: 750, class: 'skyscraper' },
+      { name: 'Dharavi Lowland Enclave', lat: 19.0400, lng: 72.8560, baseElev: 4.8, count: 70, radiusM: 900, class: 'houses' },
+      { name: 'Kurla Mithi River Suburb', lat: 19.0728, lng: 72.8826, baseElev: 3.4, count: 65, radiusM: 850, class: 'houses' },
+      { name: 'Andheri Commercial Axis', lat: 19.1136, lng: 72.8697, baseElev: 5.8, count: 50, radiusM: 750, class: 'midrise' },
+    ];
+  } else if (region === 'bhubaneswar') {
+    sectors = [
+      { name: 'Infocity Tech Towers', lat: 20.3550, lng: 85.8180, baseElev: 38.0, count: 45, radiusM: 800, class: 'skyscraper' },
+      { name: 'Janpath Commercial Corridor', lat: 20.2961, lng: 85.8245, baseElev: 36.0, count: 55, radiusM: 850, class: 'midrise' },
+      { name: 'Old Town Residential Quarter', lat: 20.2450, lng: 85.8320, baseElev: 32.0, count: 60, radiusM: 900, class: 'houses' },
+    ];
+  } else {
+    // Kolkata
+    sectors = [
+      { name: 'Salt Lake Sector V Tech Skyline', lat: 22.5849, lng: 88.4250, baseElev: 3.5, count: 60, radiusM: 850, class: 'skyscraper' },
+      { name: 'Park Street Financial Corridor', lat: 22.5531, lng: 88.3507, baseElev: 5.2, count: 50, radiusM: 750, class: 'midrise' },
+      { name: 'Howrah Waterfront Settlements', lat: 22.5958, lng: 88.3142, baseElev: 3.9, count: 65, radiusM: 900, class: 'houses' },
+    ];
+  }
 
-    clusters.forEach((c) => {
-      for (let i = 0; i < c.count; i++) {
-        const angle = pseudoRand() * Math.PI * 2;
-        const dist = Math.sqrt(pseudoRand()) * c.radiusM;
+  sectors.forEach((sec) => {
+    // Lay buildings along regular streets and avenues
+    const gridCols = Math.ceil(Math.sqrt(sec.count * 1.3));
+    const gridRows = Math.ceil(sec.count / gridCols);
+    const spacingM = sec.class === 'skyscraper' ? 65 : sec.class === 'midrise' ? 50 : 38;
+
+    let index = 0;
+    for (let r = -gridRows / 2; r < gridRows / 2 && index < sec.count; r++) {
+      for (let c = -gridCols / 2; c < gridCols / 2 && index < sec.count; c++) {
+        index++;
+
+        // Add street jitter
+        const offsetX = c * spacingM + (rand() * 12 - 6);
+        const offsetY = r * spacingM + (rand() * 12 - 6);
+
         const latScale = 1 / 111000;
-        const lngScale = 1 / (111000 * Math.cos((c.centerLat * Math.PI) / 180));
+        const lngScale = 1 / (111000 * Math.cos((sec.lat * Math.PI) / 180));
 
-        const bLat = c.centerLat + Math.sin(angle) * dist * latScale;
-        const bLng = c.centerLng + Math.cos(angle) * dist * lngScale;
+        const bLat = sec.lat + offsetY * latScale;
+        const bLng = sec.lng + offsetX * lngScale;
 
-        // Heights
-        let heightM;
-        let widthM = 20 + pseudoRand() * 25;
-        let lengthM = 25 + pseudoRand() * 30;
+        // Realistic dimensions based on building class
+        let widthM, lengthM, heightM, colorTheme;
 
-        if (c.type === 'residential') {
-          heightM = 8 + pseudoRand() * 16; // 2-6 floors
-        } else if (c.type === 'commercial') {
-          heightM = 22 + pseudoRand() * 45; // 7-20 floors
+        if (sec.class === 'skyscraper') {
+          widthM = 32 + rand() * 26;
+          lengthM = 36 + rand() * 32;
+          heightM = 55 + rand() * 85; // 55m to 140m skyscraper!
+          colorTheme = rand() > 0.4 ? 'glass-tower' : 'steel-tower';
+        } else if (sec.class === 'midrise') {
+          widthM = 26 + rand() * 22;
+          lengthM = 30 + rand() * 24;
+          heightM = 22 + rand() * 38; // 22m to 60m
+          colorTheme = rand() > 0.5 ? 'concrete-midrise' : 'modern-commercial';
         } else {
-          heightM = 14 + pseudoRand() * 20; // 4-8 floors
+          // Residential houses
+          widthM = 16 + rand() * 14;
+          lengthM = 20 + rand() * 16;
+          heightM = 8 + rand() * 12; // 8m to 20m (1-4 stories)
+          colorTheme = rand() > 0.4 ? 'residential-warm' : 'residential-terracotta';
         }
 
-        const rot = pseudoRand() * 90;
-        const elev = Math.max(0.5, Number((c.baseElev + (pseudoRand() * 1.6 - 0.8)).toFixed(1)));
+        const rot = (Math.floor(rand() * 4) * 45) + (rand() * 10 - 5);
+        const elev = Math.max(0.4, Number((sec.baseElev + (rand() * 1.8 - 0.9)).toFixed(1)));
 
         buildings.push({
           id: `BLD-${region.toUpperCase()}-${buildings.length + 1}`,
-          name: `${c.name} Sector #${i + 1}`,
-          type: c.type,
-          polygon: makeBuildingPolygon(bLat, bLng, widthM, lengthM, rot),
+          name: `${sec.name} · Unit ${index}`,
+          type: sec.class,
+          theme: colorTheme,
+          polygon: makeBuildingFootprint(bLat, bLng, widthM, lengthM, rot),
           center: [bLng, bLat],
           elevation_m: elev,
           height_m: Math.round(heightM),
-          floors: Math.max(1, Math.round(heightM / 3.2)),
+          floors: Math.max(1, Math.round(heightM / 3.4)),
         });
       }
-    });
-  } else if (region === 'mumbai') {
-    const clusters = [
-      { name: 'Dharavi Sector', centerLat: 19.0400, centerLng: 72.8560, baseElev: 4.8, count: 60, radiusM: 900, type: 'residential' },
-      { name: 'Kurla Mithi Basin', centerLat: 19.0728, centerLng: 72.8826, baseElev: 3.5, count: 55, radiusM: 800, type: 'residential' },
-      { name: 'Bandra Coastal', centerLat: 19.0596, centerLng: 72.8295, baseElev: 6.5, count: 45, radiusM: 900, type: 'commercial' },
-      { name: 'Andheri Hub', centerLat: 19.1136, centerLng: 72.8697, baseElev: 4.2, count: 50, radiusM: 850, type: 'commercial' },
-    ];
-
-    clusters.forEach((c) => {
-      for (let i = 0; i < c.count; i++) {
-        const angle = pseudoRand() * Math.PI * 2;
-        const dist = Math.sqrt(pseudoRand()) * c.radiusM;
-        const latScale = 1 / 111000;
-        const lngScale = 1 / (111000 * Math.cos((c.centerLat * Math.PI) / 180));
-
-        const bLat = c.centerLat + Math.sin(angle) * dist * latScale;
-        const bLng = c.centerLng + Math.cos(angle) * dist * lngScale;
-
-        const heightM = c.type === 'commercial' ? 30 + pseudoRand() * 50 : 12 + pseudoRand() * 24;
-        const elev = Math.max(0.8, Number((c.baseElev + (pseudoRand() * 1.5 - 0.75)).toFixed(1)));
-
-        buildings.push({
-          id: `BLD-${region.toUpperCase()}-${buildings.length + 1}`,
-          name: `${c.name} Unit #${i + 1}`,
-          type: c.type,
-          polygon: makeBuildingPolygon(bLat, bLng, 25 + pseudoRand() * 20, 30 + pseudoRand() * 25, pseudoRand() * 90),
-          center: [bLng, bLat],
-          elevation_m: elev,
-          height_m: Math.round(heightM),
-          floors: Math.max(1, Math.round(heightM / 3.2)),
-        });
-      }
-    });
-  } else {
-    // Generic generator for Bhubaneswar, Kolkata, etc.
-    const centerLat = region === 'bhubaneswar' ? 20.2961 : 22.5726;
-    const centerLng = region === 'bhubaneswar' ? 85.8245 : 88.3639;
-    const baseElev = region === 'bhubaneswar' ? 35.0 : 3.8;
-
-    for (let i = 0; i < 120; i++) {
-      const angle = pseudoRand() * Math.PI * 2;
-      const dist = Math.sqrt(pseudoRand()) * 2200;
-      const latScale = 1 / 111000;
-      const lngScale = 1 / (111000 * Math.cos((centerLat * Math.PI) / 180));
-
-      const bLat = centerLat + Math.sin(angle) * dist * latScale;
-      const bLng = centerLng + Math.cos(angle) * dist * lngScale;
-
-      const heightM = 10 + pseudoRand() * 32;
-      const elev = Math.max(1.0, Number((baseElev + (pseudoRand() * 2 - 1)).toFixed(1)));
-
-      buildings.push({
-        id: `BLD-${region.toUpperCase()}-${i + 1}`,
-        name: `${region.toUpperCase()} Urban Block #${i + 1}`,
-        type: i % 3 === 0 ? 'commercial' : 'residential',
-        polygon: makeBuildingPolygon(bLat, bLng, 25 + pseudoRand() * 20, 30 + pseudoRand() * 20, pseudoRand() * 90),
-        center: [bLng, bLat],
-        elevation_m: elev,
-        height_m: Math.round(heightM),
-        floors: Math.max(1, Math.round(heightM / 3.2)),
-      });
     }
-  }
+  });
 
   return buildings;
 }
 
-// Distance helper
+// Distance helper (km)
 function distanceKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -208,22 +189,22 @@ export function useBuildings3DLayer({
       extruded: true,
       getPolygon: (d) => d.polygon,
       getElevation: (d) => d.height_m,
-      elevationScale: 1.2,
-      getLineWidth: 1,
+      elevationScale: 1.15,
+      getLineWidth: 1.2,
       lineWidthMinPixels: 1,
 
-      // ── Dynamic Color Logic with Inundation & Cyclone Physics ──
+      // ── Shading & Inundation Physics (Matches real flood aerial view) ──
       getFillColor: (d) => {
         // 1. Flood Inundation Physics
         if (disasterType === 'flood' && waterLevel > 0) {
           const submergedDepth = waterLevel - d.elevation_m;
           if (submergedDepth > 0) {
-            // Completely underwater
+            // Completely underwater (roof is covered by flood water)
             if (submergedDepth >= d.height_m) {
-              return [30, 90, 230, 190]; // Deep water blue
+              return [18, 55, 120, 160]; // Deep water refraction blue
             }
-            // Partially flooded ground floor
-            return [234, 88, 12, 220]; // Flooding alert orange
+            // Partially submerged (water rising around base and lower floors)
+            return [234, 88, 12, 230]; // Critical flood alert orange
           }
         }
 
@@ -233,39 +214,46 @@ export function useBuildings3DLayer({
           const dist = distanceKm(cycloneEye.lat, cycloneEye.lng, bLat, bLng);
           if (dist <= cycloneRadius) {
             if (dist <= cycloneRadius * 0.35) {
-              return [220, 38, 38, 230]; // Core damage red
+              return [220, 38, 38, 240]; // Catastrophic eyewall damage
             }
-            return [249, 115, 22, 210]; // High wind amber
+            return [249, 115, 22, 220]; // Gale-force wind impact
           }
         }
 
-        // 3. Normal dry state: Architectural warm tones
-        if (d.type === 'commercial') {
-          return [218, 222, 228, 235]; // Modern steel/glass tone
+        // 3. Normal Photorealistic Architectural Shading
+        switch (d.theme) {
+          case 'glass-tower':
+            return [225, 235, 245, 250]; // Bright reflective glass
+          case 'steel-tower':
+            return [205, 215, 225, 250]; // Steel/slate corporate facade
+          case 'concrete-midrise':
+            return [230, 226, 218, 250]; // Modern civic concrete
+          case 'modern-commercial':
+            return [240, 238, 232, 250]; // Cream commercial stone
+          case 'residential-terracotta':
+            return [225, 175, 155, 250]; // Terracotta/clay roof
+          default:
+            return [238, 234, 224, 250]; // Warm residential plaster
         }
-        if (d.type === 'civic') {
-          return [230, 220, 205, 235]; // Warm stone tone
-        }
-        return [226, 220, 210, 230]; // Residential brick/cream
       },
 
       getLineColor: (d) => {
         if (disasterType === 'flood' && waterLevel > d.elevation_m) {
-          return [59, 130, 246, 255];
+          return [56, 189, 248, 255]; // Luminous water-line highlight
         }
         if (disasterType === 'cyclone' && cycloneEye && cycloneRadius > 0) {
           const [bLng, bLat] = d.center;
           const dist = distanceKm(cycloneEye.lat, cycloneEye.lng, bLat, bLng);
           if (dist <= cycloneRadius) return [239, 68, 68, 255];
         }
-        return [160, 150, 138, 200];
+        return [140, 145, 155, 180]; // Architectural edge highlight
       },
 
       material: {
-        ambient: 0.45,
-        diffuse: 0.65,
-        shininess: 32,
-        specularColor: [60, 64, 67],
+        ambient: 0.5,
+        diffuse: 0.75,
+        shininess: 45,
+        specularColor: [100, 110, 125],
       },
 
       updateTriggers: {

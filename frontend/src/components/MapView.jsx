@@ -1,10 +1,29 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import DeckGL from '@deck.gl/react';
 import { Map } from 'react-map-gl/maplibre';
+import { AmbientLight, DirectionalLight, LightingEffect } from '@deck.gl/core';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { REGIONS } from '../constants/regions';
 import { MAP_STYLES } from '../constants/mapStyles';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Photorealistic 3D Sun & Ambient Lighting
+// Replicates the aerial sunlight angle and specular water gloss from satellite photos
+// ─────────────────────────────────────────────────────────────────────────────
+const ambientLight = new AmbientLight({
+  color: [255, 255, 255],
+  intensity: 1.4,
+});
+
+const sunLight = new DirectionalLight({
+  color: [255, 250, 240],
+  intensity: 2.2,
+  direction: [-1.4, -2.8, -2.0],
+  _shadow: true,
+});
+
+const lightingEffect = new LightingEffect({ ambientLight, sunLight });
 
 /**
  * MapView — 3D Interactive Disaster Relief Map
@@ -127,6 +146,7 @@ function MapView({
           doubleClickZoom: true,
         }}
         layers={layers}
+        effects={[lightingEffect]}
         onClick={handleMapClick}
         getCursor={({ isDragging }) => (isDragging ? 'grabbing' : 'grab')}
       >

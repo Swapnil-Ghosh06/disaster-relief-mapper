@@ -3,6 +3,32 @@
 // ─────────────────────────────────────────────────────────────────────────────
 export const MAP_STYLES = [
   {
+    id: 'satellite',
+    label: '🛰️ 3D Photorealistic Satellite',
+    style: {
+      version: 8,
+      sources: {
+        'satellite-tiles': {
+          type: 'raster',
+          tiles: [
+            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          ],
+          tileSize: 256,
+          attribution: '© Esri, Maxar, Earthstar Geographics',
+        },
+      },
+      layers: [
+        {
+          id: 'satellite-tiles-layer',
+          type: 'raster',
+          source: 'satellite-tiles',
+          minzoom: 0,
+          maxzoom: 19,
+        },
+      ],
+    },
+  },
+  {
     id: 'osm',
     label: 'OpenStreetMap Standard',
     style: {
