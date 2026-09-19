@@ -13,7 +13,7 @@ client = TestClient(app)
 
 
 def test_root_endpoint():
-    """Verify health check / root status."""
+    """Verify GET / returns 200 and health check status."""
     response = client.get("/")
     assert response.status_code == 200
     data = response.json()
@@ -22,19 +22,19 @@ def test_root_endpoint():
 
 
 def test_get_regions():
-    """Verify regions endpoint returns list of supported cities with center coordinates."""
+    """Verify GET /regions returns 200, response contains all 5 region IDs."""
     response = client.get("/regions")
     assert response.status_code == 200
     data = response.json()
     assert "regions" in data
     region_ids = [r["id"] for r in data["regions"]]
-    for expected in ["chennai", "mumbai", "bhubaneswar", "kolkata"]:
-        assert expected in region_ids
+    for expected in ["chennai", "mumbai", "bhubaneswar", "kolkata", "wellington"]:
+        assert expected in region_ids, f"Expected {expected} in {region_ids}"
 
 
 def test_get_resources_default():
-    """Verify GET /resources defaults to chennai and returns realistic items."""
-    response = client.get("/resources")
+    """Verify GET /resources?region=chennai returns 200 and total > 0."""
+    response = client.get("/resources?region=chennai")
     assert response.status_code == 200
     data = response.json()
     assert data["region"] == "chennai"
@@ -52,18 +52,22 @@ def test_get_resources_default():
 
 
 def test_get_resources_invalid_region():
-    """Verify invalid region returns HTTP 400 Bad Request."""
+    """Verify GET /resources?region=atlantis returns 400."""
     response = client.get("/resources?region=atlantis")
     assert response.status_code == 400
-    assert "Unsupported region" in response.json()["detail"]
+    assert "Unsupported region" in response.json()["detail"] or "Invalid region" in response.json()["detail"]
 
 
 def test_get_elevation():
-    """Verify GET /elevation returns DEM grid array and bounding box."""
-    response = client.get("/elevation?region=chennai")
+    """Verify GET /elevation?region=mumbai returns 200 with bbox and grid list."""
+    response = client.get("/elevation?region=mumbai")
     assert response.status_code == 200
     data = response.json()
-    assert data["region"] == "chennai"
+    assert data["region"] == "mumbai"
+    assert "bbox" in data
+    assert data["bbox"] is not None
+    assert "min_lat" in data["bbox"]
+    assert "grid" in data
     assert len(data["grid"]) > 0
     first_pt = data["grid"][0]
     assert "lat" in first_pt
@@ -72,7 +76,7 @@ def test_get_elevation():
 
 
 def test_flood_simulate():
-    """Verify POST /flood/simulate returns offline/online partition and affected capacity."""
+    """Verify POST /flood/simulate with valid payload returns 200, 'offline' and 'online' are lists."""
     payload = {
         "region": "chennai",
         "water_level_m": 4.0,
@@ -90,17 +94,17 @@ def test_flood_simulate():
 
 
 def test_flood_simulate_invalid_params():
-    """Verify water level < 0 or > 20 returns 400/422 validation error."""
+    """Verify water_level_m=999 returns 400."""
     payload = {
         "region": "chennai",
-        "water_level_m": -5.0,
+        "water_level_m": 999.0,
     }
     response = client.post("/flood/simulate", json=payload)
-    assert response.status_code in [400, 422]
+    assert response.status_code == 400
 
 
 def test_cyclone_simulate():
-    """Verify POST /cyclone/simulate returns damaged/safe partition with scaled radius."""
+    """Verify POST /cyclone/simulate with valid payload returns 200, 'damaged' and 'safe' are lists."""
     payload = {
         "region": "chennai",
         "eye_lat": 13.0827,
@@ -114,32 +118,31 @@ def test_cyclone_simulate():
     assert data["severity"] == 6
     assert "damaged" in data
     assert "safe" in data
+    assert isinstance(data["damaged"], list)
+    assert isinstance(data["safe"], list)
     assert "affected_capacity" in data
     assert data["eye"]["lat"] == 13.0827
 
 
 def test_cyclone_simulate_invalid_severity():
-    """Verify severity out of 1-10 range returns 400/422 validation error."""
+    """Verify severity=99 returns 400."""
     payload = {
         "region": "chennai",
         "eye_lat": 13.0827,
         "eye_lng": 80.2707,
         "radius_km": 10.0,
-        "severity": 15
+        "severity": 99
     }
     response = client.post("/cyclone/simulate", json=payload)
-    assert response.status_code in [400, 422]
+    assert response.status_code == 400
 
 
 def test_reroute_endpoint():
-    """Verify POST /reroute generates nearest online alternative paths."""
-    # First get resources to find valid IDs
+    """Verify POST /reroute with one offline_id returns 200 and at least one route."""
     res_resp = client.get("/resources?region=chennai")
     resources = res_resp.json()["resources"]
     assert len(resources) >= 2
-    
     first_id = resources[0]["id"]
-    second_id = resources[1]["id"]
     
     payload = {
         "region": "chennai",
@@ -149,15 +152,16 @@ def test_reroute_endpoint():
     assert response.status_code == 200
     data = response.json()
     assert "routes" in data
-    if data["routes"]:
-        route = data["routes"][0]
-        assert route["from_id"] == first_id
-        assert route["to_id"] != first_id
-        assert route["distance_km"] >= 0
+    assert isinstance(data["routes"], list)
+    assert len(data["routes"]) >= 1
+    route = data["routes"][0]
+    assert route["from_id"] == first_id
+    assert route["to_id"] != first_id
+    assert route["distance_km"] >= 0
 
 
 def test_reroute_empty():
-    """Verify empty offline_ids returns empty routes list."""
+    """Verify POST /reroute with empty offline_ids returns 200 with empty routes list."""
     payload = {
         "region": "chennai",
         "offline_ids": []

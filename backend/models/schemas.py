@@ -95,7 +95,7 @@ class ElevationResponse(BaseModel):
 class FloodSimulateRequest(BaseModel):
     """Request payload for POST /flood/simulate."""
     region: str = Field(..., description="Region to simulate flood on (e.g. 'chennai')")
-    water_level_m: float = Field(..., ge=0.0, le=20.0, description="Simulated flood water level in meters (0 to 20m)")
+    water_level_m: float = Field(..., description="Simulated flood water level in meters (0 to 20m)")
     resource_ids: Optional[List[str]] = Field(default_factory=list, description="Optional subset filter of resource IDs")
 
 
@@ -118,8 +118,8 @@ class CycloneSimulateRequest(BaseModel):
     region: str = Field(..., description="Region identifier key")
     eye_lat: float = Field(..., description="Latitude of cyclone center")
     eye_lng: float = Field(..., description="Longitude of cyclone center")
-    radius_km: float = Field(..., gt=0.0, le=200.0, description="Base wind radius in kilometers")
-    severity: int = Field(..., ge=1, le=10, description="Cyclone severity index from 1 to 10")
+    radius_km: float = Field(..., description="Base wind radius in kilometers")
+    severity: int = Field(..., description="Cyclone severity index from 1 to 10")
 
 
 class CycloneSimulateResponse(BaseModel):
