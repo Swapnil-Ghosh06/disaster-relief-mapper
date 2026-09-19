@@ -1,10 +1,30 @@
 import { useState, useEffect } from 'react';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TopNav — Emergency Operations Command Header
+// TopNav — Wellington Smart City Digital Twin Header (Matching Screenshot 5)
 // ─────────────────────────────────────────────────────────────────────────────
 
+export const CATEGORIES = [
+  { id: 'transport', label: 'Transport', icon: '🚆' },
+  { id: 'summary',   label: 'Summary',   icon: '📊' },
+  { id: 'fleet',     label: 'Fleet Evac',icon: '🚗' },
+  { id: 'rescue',    label: 'Rescue',    icon: '🚴' },
+  { id: 'shelters',  label: 'Shelters',  icon: '🏢' },
+  { id: 'corridors', label: 'Corridors', icon: '🛣️' },
+  { id: 'marine',    label: 'Marine',    icon: '⚓' },
+  { id: 'air',       label: 'Air Lift',  icon: '✈️' },
+];
+
 export const PRESET_SCENARIOS = [
+  {
+    id: 'wellington-surge',
+    title: 'Wellington Harbor 8m Surge (Digital Twin)',
+    region: 'wellington',
+    disasterType: 'flood',
+    targetLevel: 8.0,
+    speed: 2,
+    description: 'Harbor storm surge inundating Lambton Quay & waterfront transit',
+  },
   {
     id: 'chennai-flood-2015',
     title: 'Chennai 2015 Historic Flood',
@@ -48,12 +68,18 @@ export const PRESET_SCENARIOS = [
 ];
 
 export function TopNav({
+  activeCategory = 'transport',
+  onSelectCategory,
   onSelectScenario,
   onOpenReport,
   onOpenShortcuts,
-  offlineCount = 0,
-  disasterType = 'flood',
+  onToggle3D,
+  is3D = true,
+  onToggleSim,
   isRunning = false,
+  offlineCount = 0,
+  onToggleDispatch,
+  isDispatchOpen = false,
 }) {
   const [timeStr, setTimeStr] = useState('');
 
@@ -66,7 +92,7 @@ export function TopNav({
           hour: '2-digit',
           minute: '2-digit',
           second: '2-digit',
-        }) + ' IST'
+        })
       );
     };
     updateTime();
@@ -75,64 +101,104 @@ export function TopNav({
   }, []);
 
   return (
-    <header className="ops-topnav">
-      {/* Brand & Mission title */}
-      <div className="ops-brand">
-        <div className="ops-status-beacon" style={{ background: offlineCount > 0 ? '#dc2626' : '#16a34a' }} />
-        <div>
-          <div className="ops-title">DISASTER RELIEF MAPPER</div>
-          <div className="ops-subtitle">EMERGENCY OPERATIONS COMMAND CENTER</div>
+    <header className="digital-twin-header">
+      {/* Left: Category tabs matching Screenshot 5 */}
+      <div className="header-left-nav">
+        <div className="active-category-pill">
+          {activeCategory === 'transport' ? 'Transport' : activeCategory.toUpperCase()}
+        </div>
+
+        <div className="category-icons-group">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              className={`cat-icon-btn ${activeCategory === cat.id ? 'active' : ''}`}
+              onClick={() => onSelectCategory?.(cat.id)}
+              title={cat.label}
+            >
+              <span className="cat-emoji">{cat.icon}</span>
+              <span className="cat-text">{cat.label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Center: Live Situational Alert & Presets */}
-      <div className="ops-center-controls">
-        <div className="scenario-selector-wrap">
-          <span className="scenario-label">⚡ SCENARIOS:</span>
-          <select
-            className="scenario-select"
-            defaultValue=""
-            onChange={(e) => {
-              const scenario = PRESET_SCENARIOS.find((s) => s.id === e.target.value);
-              if (scenario) onSelectScenario(scenario);
-              e.target.value = '';
-            }}
-          >
-            <option value="" disabled>Load Emergency Scenario Preset…</option>
-            {PRESET_SCENARIOS.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.title}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Live status badge */}
-        <div className={`ops-alert-badge ${offlineCount > 0 ? 'critical' : 'nominal'}`}>
-          <span className="badge-dot" />
-          {offlineCount > 0
-            ? `LEVEL 3 DISASTER: ${offlineCount} FACILITIES COMPROMISED`
-            : 'SYSTEM NOMINAL · ALL NODES ACTIVE'}
-        </div>
+      {/* Center: Brand & Mission title matching Screenshot 5 */}
+      <div className="header-center-branding">
+        <div className="twin-title">Tō Tātou Pōneke · Disaster Relief Digital Twin</div>
+        <div className="twin-subtitle">SMART CITY RESILIENCE TECHNOLOGIES</div>
       </div>
 
-      {/* Right actions & clock */}
-      <div className="ops-right-tools">
-        <button
-          className="ops-btn secondary"
-          onClick={onOpenShortcuts}
-          title="Keyboard Shortcuts (Press ?)"
+      {/* Right: Quick circular action tools matching Screenshot 5 */}
+      <div className="header-right-tools">
+        {/* Scenario dropdown */}
+        <select
+          className="twin-scenario-select"
+          defaultValue=""
+          onChange={(e) => {
+            const scenario = PRESET_SCENARIOS.find((s) => s.id === e.target.value);
+            if (scenario) onSelectScenario(scenario);
+            e.target.value = '';
+          }}
         >
-          ⌨ Shortcuts
-        </button>
+          <option value="" disabled>⚡ Scenarios…</option>
+          {PRESET_SCENARIOS.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.title}
+            </option>
+          ))}
+        </select>
+
+        {/* Action icons with labels below */}
         <button
-          className="ops-btn primary"
+          className={`twin-tool-btn ${is3D ? 'active' : ''}`}
+          onClick={onToggle3D}
+          title="Toggle 3D Terrain Relief"
+        >
+          <span className="tool-icon">🌐</span>
+          <span className="tool-label">Earth</span>
+        </button>
+
+        <button
+          className={`twin-tool-btn ${isRunning ? 'active' : ''}`}
+          onClick={onToggleSim}
+          title={isRunning ? 'Pause Simulation' : 'Run Simulation'}
+        >
+          <span className="tool-icon">{isRunning ? '⏸' : '⏱️'}</span>
+          <span className="tool-label">Time</span>
+        </button>
+
+        <button
+          className={`twin-tool-btn ${isDispatchOpen ? 'active' : ''}`}
+          onClick={onToggleDispatch}
+          title="Toggle Live Dispatch Drawer"
+        >
+          <span className="tool-icon">📋</span>
+          <span className="tool-label">Dispatch</span>
+        </button>
+
+        <button
+          className="twin-tool-btn"
           onClick={onOpenReport}
-          title="Export Situation Report"
+          title="Open Situation Report"
         >
-          📋 SITREP Report
+          <span className="tool-icon">📄</span>
+          <span className="tool-label">SITREP</span>
         </button>
-        <div className="ops-clock">{timeStr}</div>
+
+        <button
+          className="twin-tool-btn"
+          onClick={onOpenShortcuts}
+          title="Keyboard Shortcuts"
+        >
+          <span className="tool-icon">⌨️</span>
+          <span className="tool-label">Keys</span>
+        </button>
+
+        <div className="header-clock">
+          <span className="clock-dot" style={{ background: offlineCount > 0 ? '#ef4444' : '#10b981' }} />
+          <span>{timeStr}</span>
+        </div>
       </div>
     </header>
   );

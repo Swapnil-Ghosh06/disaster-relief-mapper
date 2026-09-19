@@ -144,6 +144,7 @@ function MapView({
           touchZoom:  true,
           keyboard:   true,
           doubleClickZoom: true,
+          maxPitch:   85,
         }}
         layers={layers}
         effects={[lightingEffect]}
@@ -155,7 +156,19 @@ function MapView({
           reuseMaps
           {...viewState}
           mapStyle={MAP_STYLES[activeStyleIndex].style}
+          terrain={is3DMode ? { source: 'terrain-dem', exaggeration: 1.8 } : undefined}
+          maxPitch={85}
           attributionControl={false}
+          onLoad={(e) => {
+            const map = e.target;
+            if (map && map.setTerrain && is3DMode) {
+              try {
+                map.setTerrain({ source: 'terrain-dem', exaggeration: 1.8 });
+              } catch (err) {
+                console.warn('MapLibre terrain setup:', err);
+              }
+            }
+          }}
         />
 
         {children}

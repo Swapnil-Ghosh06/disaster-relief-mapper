@@ -16,6 +16,22 @@ const api = axios.create({
 
 // ── Mock data (used when backend is not yet running) ────────────────────────
 const MOCK_RESOURCES = {
+  wellington: [
+    { id: 'WN001', type: 'shelter', name: 'Westpac Stadium Regional Evac Center', lat: -41.2728, lng: 174.7858, elevation_m: 3.5, capacity: 5000, status: 'online', region: 'wellington' },
+    { id: 'WN002', type: 'shelter', name: 'Te Papa Waterfront Safe Zone', lat: -41.2904, lng: 174.7820, elevation_m: 2.1, capacity: 1200, status: 'online', region: 'wellington' },
+    { id: 'WN003', type: 'shelter', name: 'Thorndon Community Transit Depot', lat: -41.2710, lng: 174.7780, elevation_m: 6.8, capacity: 850, status: 'online', region: 'wellington' },
+    { id: 'WN004', type: 'shelter', name: 'Mount Victoria Emergency Base', lat: -41.2960, lng: 174.7930, elevation_m: 145.0, capacity: 600, status: 'online', region: 'wellington' },
+    { id: 'WN005', type: 'shelter', name: 'Karori Recreation Center', lat: -41.2840, lng: 174.7410, elevation_m: 180.0, capacity: 900, status: 'online', region: 'wellington' },
+    { id: 'WN006', type: 'shelter', name: 'Miramar Peninsula Relief Hub', lat: -41.3120, lng: 174.8180, elevation_m: 8.5, capacity: 750, status: 'online', region: 'wellington' },
+    // Food banks & logistics
+    { id: 'WF001', type: 'food_bank', name: 'Queens Wharf Supply Kitchen', lat: -41.2855, lng: 174.7785, elevation_m: 2.4, daily_meals: 2500, status: 'online', region: 'wellington' },
+    { id: 'WF002', type: 'food_bank', name: 'Lambton Quay Relief Storehouse', lat: -41.2820, lng: 174.7770, elevation_m: 4.8, daily_meals: 1800, status: 'online', region: 'wellington' },
+    { id: 'WF003', type: 'food_bank', name: 'Newtown Community Aid Hub', lat: -41.3090, lng: 174.7790, elevation_m: 42.0, daily_meals: 1200, status: 'online', region: 'wellington' },
+    // Medical & Hospital
+    { id: 'WM001', type: 'medical_camp', name: 'Wellington Regional Hospital Trauma Post', lat: -41.3075, lng: 174.7775, elevation_m: 45.0, beds: 180, speciality: 'trauma', status: 'online', region: 'wellington' },
+    { id: 'WM002', type: 'medical_camp', name: 'Oriental Bay Coastal Triage Post', lat: -41.2915, lng: 174.7950, elevation_m: 1.8, beds: 60, speciality: 'emergency', status: 'online', region: 'wellington' },
+    { id: 'WM003', type: 'medical_camp', name: 'Interislander Ferry Port Medical Unit', lat: -41.2580, lng: 174.7920, elevation_m: 2.0, beds: 75, speciality: 'general', status: 'online', region: 'wellington' },
+  ],
   chennai: [
     // Shelters
     { id: 'SH001', type: 'shelter', name: 'Anna Nagar Relief Shelter', lat: 13.0850, lng: 80.2101, elevation_m: 4.2, capacity: 250, status: 'online', region: 'chennai' },

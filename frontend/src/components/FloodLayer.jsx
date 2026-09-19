@@ -62,15 +62,18 @@ const REGION_GRIDS = {
       return Math.max(28, base + noise);
     },
   },
-  kolkata: {
-    lat_min: 22.50, lat_max: 22.64,
-    lng_min: 88.30, lng_max: 88.44,
-    step: 0.0018,
+  wellington: {
+    lat_min: -41.34, lat_max: -41.25,
+    lng_min: 174.72, lng_max: 174.88,
+    step: 0.0016,
     elevation: (lat, lng) => {
-      const distHooghly = Math.abs(lng - 88.34) * 120;
-      const base = 2.8 + distHooghly * 0.04;
-      const noise = Math.sin(lat * 360) * 0.8 + Math.cos(lng * 320) * 0.6;
-      return Math.max(0.4, base + noise);
+      // Wellington Harbour basin (center ~ -41.285, 174.80)
+      const harborDist = Math.hypot(lat - (-41.285), lng - 174.80);
+      if (harborDist < 0.04) return 0.2; // Sea level bay
+      // Coastal foreshore (Lambton Quay, Thorndon, Oriental Bay)
+      const coastDist = Math.hypot(lat - (-41.288), lng - 174.78);
+      const base = coastDist * 180;
+      return Math.max(0.4, base);
     },
   },
 };
@@ -93,56 +96,49 @@ function generateElevationGrid(region) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// useFloodLayer — Photorealistic 3D Inundation Fluid Mesh
+// useFloodLayer — Fluid Water Surface (Smooth Liquid Inundation)
 // ─────────────────────────────────────────────────────────────────────────────
-export function useFloodLayer({ region = 'chennai', waterLevel = 0, visible = true }) {
+export function useFloodLayer({ region = 'wellington', waterLevel = 0, visible = true }) {
   const grid = useMemo(() => generateElevationGrid(region), [region]);
 
   return useMemo(() => {
     if (!visible || waterLevel <= 0) return null;
 
-    // Filter to only cells that are submerged at current waterLevel
+    // Filter to only areas submerged at current waterLevel
     const submergedCells = grid.filter((d) => d.elevation_m < waterLevel);
     if (!submergedCells.length) return null;
 
     return new GridCellLayer({
       id: `flood-water-mesh-${region}`,
       data: submergedCells,
-      cellSize: 195, // High resolution smooth continuous water plane
+      cellSize: 180,
       getPosition: (d) => [d.lng, d.lat],
 
-      // Photorealistic Oceanic / Storm Surge Water Shading (matches inspiration image)
+      // Photorealistic Oceanic Water Tone (Deep sapphire to crystalline cyan)
       getFillColor: (d) => {
         const depth = waterLevel - d.elevation_m;
-        // Deep water: rich oceanic navy; Shallow shore/street: translucent cyan
-        const r = Math.max(12, Math.round(28 - depth * 1.5));
-        const g = Math.min(160, Math.max(65, Math.round(110 + depth * 3)));
-        const b = Math.min(240, Math.max(170, Math.round(180 + depth * 4)));
-        const alpha = Math.min(235, Math.round(160 + depth * 12));
+        // Deep water is rich navy/cerulean; shallow edge is glossy aquamarine
+        const r = Math.max(8, Math.round(18 - depth * 1.2));
+        const g = Math.min(185, Math.max(90, Math.round(115 + depth * 5)));
+        const b = Math.min(245, Math.max(160, Math.round(180 + depth * 4)));
+        const alpha = Math.min(210, Math.max(90, Math.round(110 + depth * 12)));
 
         return [r, g, b, alpha];
       },
 
-      // Water surface height rises in real 3D
-      getElevation: (d) => {
-        const depth = waterLevel - d.elevation_m;
-        return depth * 2.8;
-      },
-
-      extruded: true,
-      elevationScale: 1,
+      // Non-extruded flat liquid plane eliminates spiky Minecraft-style pillars
+      extruded: false,
       pickable: false,
 
       material: {
-        ambient: 0.65,
-        diffuse: 0.85,
-        shininess: 90,
-        specularColor: [180, 220, 255], // Water surface specular shimmer
+        ambient: 0.8,
+        diffuse: 0.9,
+        shininess: 95,
+        specularColor: [200, 235, 255],
       },
 
       updateTriggers: {
         getFillColor: [waterLevel],
-        getElevation: [waterLevel],
         data: [waterLevel, region],
       },
     });

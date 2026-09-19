@@ -11,6 +11,8 @@ import { COLORS } from '../constants/colors';
  * - SITREP situation report exporter trigger
  */
 function InfoPanel({
+  isOpen = true,
+  onClose,
   stats,
   routes = [],
   resources = [],
@@ -26,7 +28,7 @@ function InfoPanel({
 
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'directory'
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'online' | 'offline' | 'shelter' | 'food_bank' | 'medical_camp'
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // Filtered resources for directory tab
   const filteredResources = useMemo(() => {
@@ -49,12 +51,15 @@ function InfoPanel({
     });
   }, [resources, offlineIds, searchQuery, statusFilter]);
 
+  if (!isOpen) return null;
+
   return (
     <motion.aside
-      className="sidebar sidebar-right"
-      initial={{ x: 280, opacity: 0 }}
+      className="sidebar sidebar-right digital-twin-drawer"
+      initial={{ x: 340, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      transition={{ duration: 0.4, ease: 'easeOut', delay: 0.1 }}
+      exit={{ x: 340, opacity: 0 }}
+      transition={{ duration: 0.35, ease: 'easeOut' }}
     >
       {/* Header */}
       <div className="sidebar-header">
@@ -63,13 +68,24 @@ function InfoPanel({
             <h1>📊 LIVE DISPATCH</h1>
             <div className="subtitle">{region?.toUpperCase() ?? 'NO REGION'} SECTOR</div>
           </div>
-          <button
-            className="ops-btn primary"
-            style={{ padding: '4px 8px', fontSize: 10 }}
-            onClick={onOpenReport}
-          >
-            SITREP
-          </button>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button
+              className="ops-btn primary"
+              style={{ padding: '4px 8px', fontSize: 10 }}
+              onClick={onOpenReport}
+            >
+              SITREP
+            </button>
+            {onClose && (
+              <button
+                className="drawer-close-btn"
+                onClick={onClose}
+                title="Close Drawer"
+              >
+                ✕
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Tab switch */}

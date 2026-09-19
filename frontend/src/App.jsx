@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import TopNav from './components/TopNav';
 import MapView from './components/MapView';
-import ControlPanel from './components/ControlPanel';
+import SmartCityStatsCard from './components/SmartCityStatsCard';
+import VerticalTimeScrubber from './components/VerticalTimeScrubber';
 import InfoPanel from './components/InfoPanel';
 import SitRepModal from './components/SitRepModal';
 import ShortcutsModal from './components/ShortcutsModal';
@@ -9,7 +10,6 @@ import { useResourceMarkers, ResourcePopup } from './components/ResourceMarkers'
 import { useFloodLayer } from './components/FloodLayer';
 import { useCycloneLayer } from './components/CycloneLayer';
 import { useRouteLayer } from './components/RouteLayer';
-import { useBuildings3DLayer } from './components/Buildings3DLayer';
 import { useFloodSimulation } from './hooks/useFloodSimulation';
 import { useCycloneSimulation } from './hooks/useCycloneSimulation';
 import { useRerouting } from './hooks/useRerouting';
@@ -17,13 +17,16 @@ import { fetchResources } from './services/api';
 import './index.css';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// App — Disaster Relief Resource Mapper (Emergency Operations Center)
+// App — Disaster Relief Digital Twin (Emergency Operations Center)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function App() {
   // ── Region & disaster ──────────────────────────────────────────────────
-  const [region,       setRegion]       = useState('chennai');
-  const [disasterType, setDisasterType] = useState('flood');
+  const [region,          setRegion]          = useState('wellington');
+  const [disasterType,    setDisasterType]    = useState('flood');
+  const [activeCategory,  setActiveCategory]  = useState('transport');
+  const [isDispatchOpen,  setIsDispatchOpen]  = useState(false);
+  const [is3DMode,        setIs3DMode]        = useState(true);
 
   // ── Layer visibility ───────────────────────────────────────────────────
   const [layerVisibility, setLayerVisibility] = useState({
@@ -33,7 +36,6 @@ function App() {
     floodWater:   true,
     cycloneField: true,
     reroutes:     true,
-    buildings3D:  true,
   });
 
   // ── Data ───────────────────────────────────────────────────────────────
@@ -222,36 +224,8 @@ function App() {
     },
   });
 
-  const buildings3DLayer = useBuildings3DLayer({
-    region,
-    waterLevel: disasterType === 'flood' ? flood.waterLevel : 0,
-    disasterType,
-    cycloneEye: cyclone.eyePosition,
-    cycloneRadius: disasterType === 'cyclone' ? cyclone.currentRadius : 0,
-    visible: layerVisibility.buildings3D,
-    onHoverBuilding: (info) => {
-      setHoveredBuilding(info.object || null);
-    },
-    onClickBuilding: (bld) => {
-      setSelectedResource({
-        id: bld.id,
-        name: bld.name,
-        type: bld.type === 'residential' ? 'shelter' : 'commercial',
-        lat: bld.center[1],
-        lng: bld.center[0],
-        elevation_m: bld.elevation_m,
-        height_m: bld.height_m,
-        floors: bld.floors,
-        capacity: bld.floors * 40,
-        status: (disasterType === 'flood' && flood.waterLevel > bld.elevation_m) ? 'offline' : 'online',
-        region,
-      });
-    },
-  });
-
   const deckLayers = [
     floodLayer,
-    buildings3DLayer,
     ...cycloneLayers,
     ...routeLayers,
     ...markerLayers,
@@ -260,137 +234,123 @@ function App() {
   const isRunning = disasterType === 'flood' ? flood.isRunning : cyclone.isRunning;
 
   return (
-    <div className="app-root-container">
-      {/* ── Top Ops Header ───────────────────────────────────────────── */}
+    <div className="digital-twin-app-root">
+      {/* ── Fullscreen Photorealistic 3D Map Viewport ─────────────────── */}
+      <div className="fullscreen-map-viewport">
+        {isLoading && (
+          <div className="loading-overlay">
+            <div style={{ textAlign: 'center' }}>
+              <div className="spinner" style={{ margin: '0 auto 12px' }} />
+              <div style={{ fontSize: 11, color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>
+                LOADING 3D DIGITAL TWIN {region.toUpperCase()}…
+              </div>
+            </div>
+          </div>
+        )}
+
+        <MapView
+          region={region}
+          layers={deckLayers}
+          onMapClick={handleMapClick}
+          hoveredBuilding={hoveredBuilding}
+        />
+
+        {selectedResource && (
+          <ResourcePopup
+            resource={selectedResource}
+            offline={offlineIds.includes(selectedResource.id)}
+            onClose={() => setSelectedResource(null)}
+          />
+        )}
+
+        {/* Cyclone eye placement hint */}
+        {disasterType === 'cyclone' && !cyclone.eyePosition && (
+          <div style={{
+            position: 'absolute', top: '50%', left: '50%',
+            transform: 'translate(-50%, -50%)',
+            pointerEvents: 'none',
+            background: 'rgba(10, 22, 35, 0.92)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(234, 88, 12, 0.5)',
+            borderRadius: 8, padding: '10px 20px',
+            fontSize: 11, color: '#fb923c',
+            fontFamily: 'var(--font-heading)', fontWeight: 700,
+            letterSpacing: '0.1em', textTransform: 'uppercase',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          }}>
+            🌀 Click map to place cyclone eye
+          </div>
+        )}
+      </div>
+
+      {/* ── Floating Top Navigation (Screenshot 5 Header) ─────────────── */}
       <TopNav
+        activeCategory={activeCategory}
+        onSelectCategory={(cat) => {
+          setActiveCategory(cat);
+          if (['summary', 'shelters', 'fleet', 'corridors', 'marine'].includes(cat)) {
+            setIsDispatchOpen(true);
+          }
+        }}
         onSelectScenario={handleSelectScenario}
         onOpenReport={() => setIsSitRepOpen(true)}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
-        offlineCount={offlineIds.length}
-        disasterType={disasterType}
+        onToggle3D={() => setIs3DMode((v) => !v)}
+        is3D={is3DMode}
+        onToggleSim={handleToggleSimulation}
         isRunning={isRunning}
+        offlineCount={offlineIds.length}
+        onToggleDispatch={() => setIsDispatchOpen((v) => !v)}
+        isDispatchOpen={isDispatchOpen}
       />
 
-      <div className="app-layout">
-        {/* ── Left Control Panel ───────────────────────────────────────── */}
-        <ControlPanel
-          region={region}
-          onRegionChange={setRegion}
-          disasterType={disasterType}
-          onDisasterTypeChange={setDisasterType}
-          // Flood
-          waterLevel={flood.waterLevel}
-          targetLevel={flood.targetLevel}
-          onTargetLevelChange={flood.setTargetLevel}
-          // Cyclone
-          cycloneRadius={cyclone.currentRadius}
-          targetRadius={cyclone.targetRadius}
-          onTargetRadiusChange={cyclone.setTargetRadius}
-          cycloneSeverity={cyclone.severity}
-          onSeverityChange={cyclone.setSeverity}
-          cycloneEye={cyclone.eyePosition}
-          windSpeedKph={cyclone.windSpeedKph}
-          category={cyclone.category}
-          // Shared
-          speed={disasterType === 'flood' ? flood.speed : cyclone.speed}
-          onSpeedChange={disasterType === 'flood' ? flood.setSpeed : cyclone.setSpeed}
-          isRunning={isRunning}
-          onToggleSimulation={handleToggleSimulation}
-          onReset={handleReset}
-          // Layers
-          layerVisibility={layerVisibility}
-          onLayerToggle={(key) => setLayerVisibility((prev) => ({ ...prev, [key]: !prev[key] }))}
-        />
+      {/* ── Floating Left Statistics HUD Card (Screenshot 5 Left Card) ── */}
+      <SmartCityStatsCard
+        region={region}
+        onRegionChange={setRegion}
+        disasterType={disasterType}
+        onDisasterTypeChange={setDisasterType}
+        waterLevel={flood.waterLevel}
+        targetLevel={flood.targetLevel}
+        onTargetLevelChange={flood.setTargetLevel}
+        cycloneRadius={cyclone.currentRadius}
+        targetRadius={cyclone.targetRadius}
+        onTargetRadiusChange={cyclone.setTargetRadius}
+        isRunning={isRunning}
+        onToggleSimulation={handleToggleSimulation}
+        onReset={handleReset}
+        stats={stats}
+        offlineCount={offlineIds.length}
+      />
 
-        {/* ── Centre 3D Map ────────────────────────────────────────────── */}
-        <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
-          {isLoading && (
-            <div className="loading-overlay">
-              <div style={{ textAlign: 'center' }}>
-                <div className="spinner" style={{ margin: '0 auto 12px' }} />
-                <div style={{ fontSize: 11, color: '#888880', fontFamily: 'var(--font-mono)' }}>
-                  LOADING {region.toUpperCase()}…
-                </div>
-              </div>
-            </div>
-          )}
+      {/* ── Floating Right Vertical Scrubber (Screenshot 5 Right Slider) ─ */}
+      <VerticalTimeScrubber
+        value={disasterType === 'flood' ? flood.waterLevel : cyclone.currentRadius}
+        max={disasterType === 'flood' ? 15 : 80}
+        min={0}
+        step={0.5}
+        unit={disasterType === 'flood' ? 'm' : 'km'}
+        label={disasterType === 'flood' ? 'SURGE' : 'RADIUS'}
+        onChange={(v) => {
+          if (disasterType === 'flood') flood.setTargetLevel(v);
+          else cyclone.setTargetRadius(v);
+        }}
+      />
 
-          <MapView
-            region={region}
-            layers={deckLayers}
-            onMapClick={handleMapClick}
-            hoveredBuilding={hoveredBuilding}
-          />
-
-          {selectedResource && (
-            <ResourcePopup
-              resource={selectedResource}
-              offline={offlineIds.includes(selectedResource.id)}
-              onClose={() => setSelectedResource(null)}
-            />
-          )}
-
-          {/* Cyclone eye placement hint */}
-          {disasterType === 'cyclone' && !cyclone.eyePosition && (
-            <div style={{
-              position: 'absolute', top: '50%', left: '50%',
-              transform: 'translate(-50%, -50%)',
-              pointerEvents: 'none',
-              background: 'rgba(237,232,220,0.92)',
-              border: '1px solid rgba(234,88,12,0.3)',
-              borderRadius: 8, padding: '10px 20px',
-              fontSize: 11, color: '#ea580c',
-              fontFamily: 'var(--font-heading)', fontWeight: 700,
-              letterSpacing: '0.1em', textTransform: 'uppercase',
-            }}>
-              🌀 Click map to place cyclone eye
-            </div>
-          )}
-
-          {/* Flood HUD */}
-          {disasterType === 'flood' && flood.waterLevel > 0 && (
-            <SimHUD
-              icon="🌊"
-              label={flood.isRunning ? 'FLOODING' : 'PAUSED'}
-              color="#2563eb"
-              valueLine={<>{flood.waterLevel.toFixed(2)} <span style={{ fontSize: 11, color: '#888880' }}>m</span></>}
-              progress={flood.waterLevel / 15}
-              targetLabel={`target ${flood.targetLevel} m`}
-              countValue={flood.stats.submerged}
-              countLabel="Submerged"
-              isRunning={flood.isRunning}
-            />
-          )}
-
-          {/* Cyclone HUD */}
-          {disasterType === 'cyclone' && cyclone.currentRadius > 0 && (
-            <SimHUD
-              icon="🌀"
-              label={cyclone.isRunning ? 'CYCLONE' : 'PAUSED'}
-              color="#ea580c"
-              valueLine={<>{cyclone.currentRadius.toFixed(1)} <span style={{ fontSize: 11, color: '#888880' }}>km</span></>}
-              progress={cyclone.currentRadius / cyclone.targetRadius}
-              targetLabel={`target ${cyclone.targetRadius} km · ${cyclone.category}`}
-              countValue={offlineIds.length}
-              countLabel="Damaged"
-              isRunning={cyclone.isRunning}
-            />
-          )}
-        </div>
-
-        {/* ── Right Info Panel ─────────────────────────────────────────── */}
-        <InfoPanel
-          stats={stats}
-          routes={routes}
-          resources={resources}
-          offlineIds={offlineIds}
-          disasterType={isActive ? disasterType : null}
-          severity={severity}
-          region={region}
-          onSelectResource={setSelectedResource}
-          onOpenReport={() => setIsSitRepOpen(true)}
-        />
-      </div>
+      {/* ── Sliding Dispatch Drawer ───────────────────────────────────── */}
+      <InfoPanel
+        isOpen={isDispatchOpen}
+        onClose={() => setIsDispatchOpen(false)}
+        stats={stats}
+        routes={routes}
+        resources={resources}
+        offlineIds={offlineIds}
+        disasterType={isActive ? disasterType : null}
+        severity={severity}
+        region={region}
+        onSelectResource={setSelectedResource}
+        onOpenReport={() => setIsSitRepOpen(true)}
+      />
 
       {/* ── Situation Report Modal ────────────────────────────────────── */}
       <SitRepModal
